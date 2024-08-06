@@ -192,12 +192,14 @@ def cpwer(
         uem=None,
         normalizer=None,
         partial=False,
+        known_speaker=False,
 ):
     """Computes the Concatenated minimum-Permutation Word Error Rate (cpWER)"""
     results = meeteval.wer.cpwer(
         reference, hypothesis, regex=regex,
         reference_sort=reference_sort, hypothesis_sort=hypothesis_sort,
         uem=uem, partial=partial, normalizer=normalizer,
+        known_speaker=known_speaker,
     )
     _save_results(results, hypothesis, per_reco_out, average_out)
 
@@ -530,6 +532,8 @@ class CLI:
             )
         elif name == 'files':
             command_parser.add_argument('files', nargs='+')
+        elif name == 'known_speaker':
+            command_parser.add_argument('--known-speaker', action='store_true', help='eval given the known speakers')
         else:
             raise AssertionError("Error in command definition", name)
 

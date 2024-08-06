@@ -167,7 +167,8 @@ def cpwer(
         hypothesis_sort='segment',
         uem=None,
         normalizer=None,
-        partial=False
+        partial=False,
+        known_speaker=False
 ):
     """Computes the Concatenated minimum-Permutation Word Error Rate (cpWER)"""
     from meeteval.wer.wer.cp import cp_word_error_rate_multifile
@@ -176,7 +177,7 @@ def cpwer(
         reference_sort=reference_sort, hypothesis_sort=hypothesis_sort,
         uem=uem, normalizer=normalizer,
     )
-    results = cp_word_error_rate_multifile(reference, hypothesis, partial=partial)
+    results = cp_word_error_rate_multifile(reference, hypothesis, partial=partial, known_speaker=known_speaker)
     return results
 
 

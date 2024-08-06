@@ -555,7 +555,8 @@ def apply_multi_file(
         reference, hypothesis,
         *,
         allowed_empty_examples_ratio=0.1,
-        partial=False
+        partial=False,
+        known_speaker=False
 ):
     """
     Applies a function individually to all sessions / files.
@@ -679,7 +680,10 @@ def apply_multi_file(
     results = {}
     for session in reference.keys():
         try:
-            results[session] = fn(reference[session], hypothesis.get(session, SegLST([])))
+            if known_speaker:
+                results[session] = fn(reference[session], hypothesis.get(session, SegLST([])), known_speaker=known_speaker)
+            else:
+                results[session] = fn(reference[session], hypothesis.get(session, SegLST([])))
         except:
             logging.error(f'Error in session {session}')
             raise

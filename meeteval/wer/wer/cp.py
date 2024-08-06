@@ -106,17 +106,25 @@ class CPErrorRate(ErrorRate):
         )
 
 
-def cp_error_rate(reference: 'SegLST', hypothesis: 'SegLST') -> CPErrorRate:
+def cp_error_rate(reference: 'SegLST', hypothesis: 'SegLST', known_speaker=False) -> CPErrorRate:
     from meeteval.wer.wer.siso import _seglst_siso_error_rate, siso_levenshtein_distance
-    return _cp_error_rate(
-        reference,
-        hypothesis,
-        distance_fn=siso_levenshtein_distance,
-        siso_error_rate=_seglst_siso_error_rate,
-    )
+    if known_speaker:
+        return _cp_error_rate_known_speaker(
+            reference,
+            hypothesis,
+            distance_fn=siso_levenshtein_distance,
+            siso_error_rate=_seglst_siso_error_rate,
+        )
+    else:
+        return _cp_error_rate(
+            reference,
+            hypothesis,
+            distance_fn=siso_levenshtein_distance,
+            siso_error_rate=_seglst_siso_error_rate,
+        )
 
 
-def cp_word_error_rate(reference: 'SegLST', hypothesis: 'SegLST') -> CPErrorRate:
+def cp_word_error_rate(reference: 'SegLST', hypothesis: 'SegLST', known_speaker=False) -> CPErrorRate:
     """
     The Concatenated minimum Permutation WER (cpWER).
 
@@ -171,11 +179,11 @@ def cp_word_error_rate(reference: 'SegLST', hypothesis: 'SegLST') -> CPErrorRate
                 for w in (s['words'].split() if s['words'].strip() else [''])
             ])
 
-    return cp_error_rate(split_words(reference), split_words(hypothesis))
+    return cp_error_rate(split_words(reference), split_words(hypothesis), known_speaker=known_speaker)
 
 
 def cp_word_error_rate_multifile(
-        reference, hypothesis, partial=False
+        reference, hypothesis, partial=False, known_speaker=False
 ) -> 'dict[str, CPErrorRate]':
     """
     Computes the cpWER for each example in the reference and hypothesis STM files.
@@ -183,7 +191,67 @@ def cp_word_error_rate_multifile(
     To compute the overall WER, use `sum(cp_word_error_rate_multifile(r, h).values())`.
     """
     from meeteval.io.seglst import apply_multi_file
-    return apply_multi_file(cp_word_error_rate, reference, hypothesis, partial=partial)
+    return apply_multi_file(cp_word_error_rate, reference, hypothesis, partial=partial, known_speaker=known_speaker)
+
+
+def match_sets(reference, hypothesis):
+    common = reference & hypothesis
+    only_in_reference = reference - hypothesis
+    only_in_hypothesis = hypothesis - reference
+    result = []
+    for item in common:
+        result.append((item, item))
+    for item in only_in_reference:
+        result.append((item, None))
+    for item in only_in_hypothesis:
+        result.append((None, item))
+    return tuple(result)
+
+
+def _cp_error_rate_known_speaker(
+        reference: SegLST,
+        hypothesis: SegLST,
+        distance_fn: callable,
+        siso_error_rate: callable,
+):
+    reference = reference.groupby('speaker')
+    hypothesis = hypothesis.groupby('speaker')
+    if max(len(hypothesis), len(reference)) > 20:
+        num_speakers = max(len(hypothesis), len(reference))
+        raise RuntimeError(
+            f'Are you sure?\n'
+            f'Found a total of {num_speakers} speakers in the input.\n'
+            f'This indicates a mistake in the input, or does your use-case '
+            f'really require scoring with that many speakers?\n'
+            f'See https://github.com/fgnt/meeteval/blob/main/doc/num_speaker_limits.md '
+            f'for details.'
+        )
+    missed_speaker = max(0, len(reference) - len(hypothesis))
+    falarm_speaker = max(0, len(hypothesis) - len(reference))
+    assignment = match_sets(reference=reference.keys(), hypothesis=hypothesis.keys())
+    reference_new, hypothesis_new = apply_cp_assignment(
+        assignment,
+        reference=reference,
+        hypothesis=hypothesis,
+        missing=SegLST([]),
+    )
+    er = sum([
+        siso_error_rate(r, hypothesis_new[speaker])
+        for speaker, r in reference_new.items()
+    ])
+    out = CPErrorRate(
+        er.errors, er.length,
+        insertions=er.insertions,
+        deletions=er.deletions,
+        substitutions=er.substitutions,
+        missed_speaker=missed_speaker,
+        falarm_speaker=falarm_speaker,
+        scored_speaker=len(reference),
+        assignment=assignment,
+        reference_self_overlap=None,
+        hypothesis_self_overlap=None,
+    )
+    return out
 
 
 def _cp_error_rate(
