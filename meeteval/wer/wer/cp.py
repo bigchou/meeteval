@@ -8,6 +8,8 @@ from meeteval._typing import Literal
 from meeteval.io.seglst import SegLST, asseglst, asseglistconvertible
 
 from meeteval.wer.wer.error_rate import ErrorRate
+from itertools import chain
+import jieba
 
 __all__ = [
     'CPErrorRate',
@@ -15,6 +17,13 @@ __all__ = [
     'apply_cp_assignment',
     'cp_word_error_rate_multifile'
 ]
+
+
+def tokenize_for_mer(text):
+    tokens = list(filter(lambda tok: len(tok.strip()) > 0, jieba.lcut(text)))
+    tokens = [[tok] if tok.isascii() else list(tok) for tok in tokens]
+    return list(chain(*tokens))
+
 
 
 @dataclasses.dataclass(frozen=True, repr=False)
@@ -173,12 +182,18 @@ def cp_word_error_rate(reference: 'SegLST', hypothesis: 'SegLST', known_speaker=
     hypothesis = asseglst(hypothesis, required_keys=('speaker', 'words'))
 
     def split_words(d: 'SegLST'):
+        '''
         return d.flatmap(
             lambda s: [
                 {**s, 'words': w}
                 for w in (s['words'].split() if s['words'].strip() else [''])
             ])
-
+        '''
+        return d.flatmap(
+            lambda s: [
+                {**s, 'words': w}
+                for w in (tokenize_for_mer(s['words']) if s['words'].strip() else [''])
+            ])
     return cp_error_rate(split_words(reference), split_words(hypothesis), known_speaker=known_speaker)
 
 

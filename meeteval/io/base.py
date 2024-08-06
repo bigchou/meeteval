@@ -373,7 +373,7 @@ def _open(f, mode='r'):
         return contextlib.nullcontext(io.TextIOWrapper(
             resource, resource.headers.get_content_charset()))
     elif isinstance(f, (str, os.PathLike)):
-        return open(f, mode)
+        return open(f, mode, encoding='utf-8')
     else:
         raise TypeError(type(f), f)
 
