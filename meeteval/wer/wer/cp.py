@@ -10,6 +10,8 @@ from meeteval.io.seglst import SegLST, asseglst, asseglistconvertible
 from meeteval.wer.wer.error_rate import ErrorRate
 from itertools import chain
 import jieba
+from zhtn.python.whisper_normalizers import EnglishTextNormalizer
+from zhtn.python.api import init_chinese_tn
 
 __all__ = [
     'CPErrorRate',
@@ -18,12 +20,16 @@ __all__ = [
     'cp_word_error_rate_multifile'
 ]
 
-
+######################################################
+# Text Processing
 def tokenize_for_mer(text):
     tokens = list(filter(lambda tok: len(tok.strip()) > 0, jieba.lcut(text)))
     tokens = [[tok] if tok.isascii() else list(tok) for tok in tokens]
     return list(chain(*tokens))
 
+zh_normalizer = init_chinese_tn(cc_mode='s2t', to_lower=True)
+en_normalizer = EnglishTextNormalizer()
+######################################################
 
 
 @dataclasses.dataclass(frozen=True, repr=False)
@@ -180,6 +186,12 @@ def cp_word_error_rate(reference: 'SegLST', hypothesis: 'SegLST', known_speaker=
     """
     reference = asseglst(reference, required_keys=('speaker', 'words'))
     hypothesis = asseglst(hypothesis, required_keys=('speaker', 'words'))
+
+    # text normalization
+    for t in reference:
+        t['words'] = zh_normalizer(en_normalizer(t['words']))
+    for t in hypothesis:
+        t['words'] = zh_normalizer(en_normalizer(t['words']))
 
     def split_words(d: 'SegLST'):
         '''
